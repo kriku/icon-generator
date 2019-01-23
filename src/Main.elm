@@ -1,6 +1,8 @@
-module Main exposing (Model, Msg(..), coordinates, coordinatesString, init, main, pointsInString, roundRect, update, view)
+module Main exposing (Model, Msg(..), init, main, update, view)
 
+import Array exposing (get, initialize, set)
 import Browser
+import Dict exposing (..)
 import Html exposing (Html, button, div, span, text)
 import Html.Events exposing (onClick)
 import List exposing (foldr, map, range)
@@ -18,20 +20,46 @@ main =
 
 
 type alias Model =
-    { n : Int }
+    { polygons : Dict Int Polygon }
+
+
+type alias Polygon =
+    { n : Int
+    , vector : Point
+    , position : Point
+    }
+
+
+type alias Point =
+    ( Float, Float )
 
 
 init : Model
 init =
-    { n = 6 }
+    { polygons =
+        Dict.fromList
+            [ ( 0
+              , { n = 6
+                , vector = ( 40, 30 )
+                , position = ( 50, 50 )
+                }
+              )
+            , ( 1
+              , { n = 6
+                , vector = ( 40, 0 )
+                , position = ( 50, 50 )
+                }
+              )
+            ]
+    }
 
-
-coordinates : Int -> Float -> Float -> Float -> List ( Float, Float )
-coordinates n radius x y =
+-- vector means ( radius, alpha )
+polygon : Int -> Point -> Point -> List Point
+polygon n ( radius, alpha ) ( x, y ) =
     map
         (\i ->
-            ( x + radius * sin (turns i / toFloat n)
-            , y + radius * cos (turns i / toFloat n)
+            ( x + radius * sin (alpha + turns i / toFloat n)
+            , y + radius * cos (alpha + turns i / toFloat n)
             )
         )
         (map toFloat (range 0 n))
@@ -42,26 +70,35 @@ coordinates n radius x y =
 
 
 type Msg
-    = IncrementN
-    | DecrementN
+    = ChangeN Int Int
+
+
+changeN index value model =
+    let
+        updatePolygon =
+            Maybe.map (\polygonData -> { polygonData | n = value })
+
+        polygonsUpdated =
+            Dict.update index
+                updatePolygon
+                model.polygons
+    in
+    { model | polygons = polygonsUpdated }
 
 
 update : Msg -> Model -> Model
 update msg model =
     case msg of
-        IncrementN ->
-            { model | n = model.n + 1 }
-
-        DecrementN ->
-            { model | n = model.n - 1 }
+        ChangeN index n ->
+            changeN index n model
 
 
 
 -- VIEW
 
 
-coordinatesString : Int -> String
-coordinatesString n =
+toPolygonString : List Point -> String
+toPolygonString polygons =
     String.join " "
         (map
             (\p ->
@@ -70,29 +107,56 @@ coordinatesString n =
                     ++ round 2 (Tuple.second p)
             )
             -- initial data in view - bad sign or it's view?
-            (coordinates n 50 50 50)
+            polygons
         )
 
 
-pointsInString : Model -> String
-pointsInString model =
-    foldr (++) "" (map String.fromInt (range 0 model.n))
+polygonsChanger : Model -> Html Msg
+polygonsChanger model =
+    let
+        selectedPolygon ( key, data ) =
+            div []
+                [ button [ onClick (ChangeN key (data.n - 1)) ] [ text "-" ]
+                , span [] [ text (String.fromInt data.n) ]
+                , button [ onClick (ChangeN key (data.n + 1)) ] [ text "+" ]
+                ]
+    in
+    div []
+        (model.polygons
+            |> Dict.toList
+            |> List.map selectedPolygon
+        )
 
 
-roundRect : Model -> Html.Html msg
-roundRect model =
+producedSvg : Model -> Html.Html msg
+producedSvg model =
+    let
+        renderedPolygon ( key, d ) =
+            polyline
+                [ fill "none"
+                , stroke "gray"
+                , points
+                    (toPolygonString
+                        (polygon
+                            d.n
+                            d.vector
+                            d.position
+                        )
+                    )
+                ]
+                []
+    in
     svg
         [ width "400", height "400", viewBox "0 0 100 100" ]
-        [ polyline [ fill "none", stroke "black", points (coordinatesString model.n) ] [] ]
+        (model.polygons
+            |> Dict.toList
+            |> List.map renderedPolygon
+        )
 
 
 view : Model -> Html Msg
 view model =
     div []
-        [ div []
-            [ button [ onClick DecrementN ] [ text "-" ]
-            , span [] [ text (String.fromInt model.n) ]
-            , button [ onClick IncrementN ] [ text "+" ]
-            ]
-        , roundRect model
+        [ polygonsChanger model
+        , producedSvg model
         ]
