@@ -53,7 +53,11 @@ init =
             ]
     }
 
+
+
 -- vector means ( radius, alpha )
+
+
 polygon : Int -> Point -> Point -> List Point
 polygon n ( radius, alpha ) ( x, y ) =
     map
@@ -71,8 +75,35 @@ polygon n ( radius, alpha ) ( x, y ) =
 
 type Msg
     = ChangeN Int Int
+    | AddPolygon
+    | RemovePolygon Int
 
 
+addPolygon : Model -> Model
+addPolygon model =
+    { model
+        | polygons =
+            Dict.insert
+                (Dict.size model.polygons)
+                { n = 6
+                , vector = ( 40, 0 )
+                , position = ( 50, 50 )
+                }
+                model.polygons
+    }
+
+
+removePolygon : Int -> Model -> Model
+removePolygon key model =
+    { model
+        | polygons =
+            Dict.remove
+                key
+                model.polygons
+    }
+
+
+changeN : Int -> Int -> Model -> Model
 changeN index value model =
     let
         updatePolygon =
@@ -91,6 +122,12 @@ update msg model =
     case msg of
         ChangeN index n ->
             changeN index n model
+
+        AddPolygon ->
+            addPolygon model
+
+        RemovePolygon key ->
+            removePolygon key model
 
 
 
@@ -119,6 +156,7 @@ polygonsChanger model =
                 [ button [ onClick (ChangeN key (data.n - 1)) ] [ text "-" ]
                 , span [] [ text (String.fromInt data.n) ]
                 , button [ onClick (ChangeN key (data.n + 1)) ] [ text "+" ]
+                , button [ onClick (RemovePolygon key) ] [ text "delete" ]
                 ]
     in
     div []
@@ -131,16 +169,16 @@ polygonsChanger model =
 producedSvg : Model -> Html.Html msg
 producedSvg model =
     let
-        renderedPolygon ( key, d ) =
+        renderedPolygon ( key, p ) =
             polyline
                 [ fill "none"
                 , stroke "gray"
                 , points
                     (toPolygonString
                         (polygon
-                            d.n
-                            d.vector
-                            d.position
+                            p.n
+                            p.vector
+                            p.position
                         )
                     )
                 ]
@@ -159,4 +197,5 @@ view model =
     div []
         [ polygonsChanger model
         , producedSvg model
+        , button [ onClick AddPolygon ] [ text "+" ]
         ]
