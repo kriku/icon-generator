@@ -3,8 +3,9 @@ module Main exposing (Model, Msg(..), init, main, update, view)
 import Array exposing (get, initialize, set)
 import Browser
 import Dict exposing (..)
-import Html exposing (Html, button, div, span, text)
-import Html.Events exposing (onClick)
+import Html exposing (Html, button, div, input, span, text)
+import Html.Attributes exposing (placeholder, value)
+import Html.Events exposing (onClick, onInput)
 import List exposing (foldr, map, range)
 import Round exposing (round)
 import Svg exposing (polyline, svg)
@@ -62,8 +63,8 @@ polygon : Int -> Point -> Point -> List Point
 polygon n ( radius, alpha ) ( x, y ) =
     map
         (\i ->
-            ( x + radius * sin (alpha + turns i / toFloat n)
-            , y + radius * cos (alpha + turns i / toFloat n)
+            ( x + radius * sin (degrees alpha + turns i / toFloat n)
+            , y + radius * cos (degrees alpha + turns i / toFloat n)
             )
         )
         (map toFloat (range 0 n))
@@ -75,6 +76,8 @@ polygon n ( radius, alpha ) ( x, y ) =
 
 type Msg
     = ChangeN Int Int
+    | ChangeRadius Int String
+    | ChangeAlpha Int String
     | AddPolygon
     | RemovePolygon Int
 
@@ -117,6 +120,54 @@ changeN index value model =
     { model | polygons = polygonsUpdated }
 
 
+sanitize : String -> Float
+sanitize input =
+    input |> String.toFloat |> Maybe.withDefault 0
+
+
+changeRadius : Int -> String -> Model -> Model
+changeRadius index value model =
+    let
+        updatePolygon =
+            Maybe.map
+                (\p ->
+                    { p
+                        | vector =
+                            ( sanitize value
+                            , Tuple.second p.vector
+                            )
+                    }
+                )
+
+        polygonsUpdated =
+            Dict.update index
+                updatePolygon
+                model.polygons
+    in
+    { model | polygons = polygonsUpdated }
+
+
+changeAlpha : Int -> String -> Model -> Model
+changeAlpha index value model =
+    let
+        updatePolygon =
+            Maybe.map
+                (\p ->
+                    { p
+                        | vector =
+                            ( Tuple.first p.vector
+                            , sanitize value
+                            )
+                    }
+                )
+
+        polygonsUpdated =
+            Dict.update index
+                updatePolygon
+                model.polygons
+    in
+    { model | polygons = polygonsUpdated }
+
 update : Msg -> Model -> Model
 update msg model =
     case msg of
@@ -128,6 +179,12 @@ update msg model =
 
         RemovePolygon key ->
             removePolygon key model
+
+        ChangeRadius index radius ->
+            changeRadius index radius model
+
+        ChangeAlpha index alpha ->
+            changeAlpha index alpha model
 
 
 
@@ -156,6 +213,20 @@ polygonsChanger model =
                 [ button [ onClick (ChangeN key (data.n - 1)) ] [ text "-" ]
                 , span [] [ text (String.fromInt data.n) ]
                 , button [ onClick (ChangeN key (data.n + 1)) ] [ text "+" ]
+                , input
+                    [ placeholder "radius"
+                    , value
+                        (data.vector |> Tuple.first |> round 2)
+                    , onInput (ChangeRadius key)
+                    ]
+                    []
+                , input
+                    [ placeholder "alpha"
+                    , value
+                        (data.vector |> Tuple.second |> round 2)
+                    , onInput (ChangeAlpha key)
+                    ]
+                    []
                 , button [ onClick (RemovePolygon key) ] [ text "delete" ]
                 ]
     in
