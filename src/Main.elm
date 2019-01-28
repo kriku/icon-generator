@@ -20,43 +20,32 @@ main =
 -- MODEL
 
 
-type alias Model =
-    { polygons : Dict Int Polygon }
-
-
-type alias Polygon =
-    { n : Int
-    , vector : Point
-    , position : Point
-    }
-
-
 type alias Point =
     ( Float, Float )
 
 
-init : Model
-init =
-    { polygons =
-        Dict.fromList
-            [ ( 0
-              , { n = 6
-                , vector = ( 40, 30 )
-                , position = ( 50, 50 )
-                }
-              )
-            , ( 1
-              , { n = 6
-                , vector = ( 40, 0 )
-                , position = ( 50, 50 )
-                }
-              )
-            ]
+type alias Polygon =
+    -- vector means ( radius, alpha )
+    { n : Int
+    , vector : Point
+    , position : Point
+    , fill : String
+    , stroke : String
     }
 
 
+type alias Model =
+    { polygons : Dict Int Polygon }
 
--- vector means ( radius, alpha )
+
+polygonSample : Polygon
+polygonSample =
+    { n = 6
+    , vector = ( 40, 30 )
+    , position = ( 50, 50 )
+    , fill = "none"
+    , stroke = "gray"
+    }
 
 
 polygon : Int -> Point -> Point -> List Point
@@ -68,6 +57,17 @@ polygon n ( radius, alpha ) ( x, y ) =
             )
         )
         (map toFloat (range 0 n))
+
+
+init : Model
+init =
+    { polygons =
+        Dict.fromList
+            -- polygonRadius - update
+            [ ( 0, polygonRadius 40 polygonSample )
+            , ( 1, polygonRadius 50 polygonSample )
+            ]
+    }
 
 
 
@@ -88,10 +88,7 @@ addPolygon model =
         | polygons =
             Dict.insert
                 (Dict.size model.polygons)
-                { n = 6
-                , vector = ( 40, 0 )
-                , position = ( 50, 50 )
-                }
+                polygonSample
                 model.polygons
     }
 
@@ -125,19 +122,11 @@ sanitize input =
     input |> String.toFloat |> Maybe.withDefault 0
 
 
-changeRadius : Int -> String -> Model -> Model
-changeRadius index value model =
+changePolygon : Int -> Polygon -> Model -> Model
+changePolygon index p model =
     let
         updatePolygon =
-            Maybe.map
-                (\p ->
-                    { p
-                        | vector =
-                            ( sanitize value
-                            , Tuple.second p.vector
-                            )
-                    }
-                )
+            Maybe.map (\_ -> p)
 
         polygonsUpdated =
             Dict.update index
@@ -145,6 +134,27 @@ changeRadius index value model =
                 model.polygons
     in
     { model | polygons = polygonsUpdated }
+
+
+polygonRadius : Float -> Polygon -> Polygon
+polygonRadius radius p =
+    { p
+        | vector =
+            ( radius, Tuple.second p.vector )
+    }
+
+
+changeRadius : Int -> String -> Model -> Model
+changeRadius index radius model =
+    changePolygon index
+        (polygonRadius
+            (sanitize radius)
+            (model.polygons
+                |> Dict.get index
+                |> Maybe.withDefault polygonSample
+            )
+        )
+        model
 
 
 changeAlpha : Int -> String -> Model -> Model
@@ -167,6 +177,7 @@ changeAlpha index value model =
                 model.polygons
     in
     { model | polygons = polygonsUpdated }
+
 
 update : Msg -> Model -> Model
 update msg model =
@@ -242,8 +253,8 @@ producedSvg model =
     let
         renderedPolygon ( key, p ) =
             polyline
-                [ fill "none"
-                , stroke "gray"
+                [ fill p.fill
+                , stroke p.stroke
                 , points
                     (toPolygonString
                         (polygon
