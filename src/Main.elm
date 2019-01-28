@@ -41,7 +41,7 @@ type alias Model =
 polygonSample : Polygon
 polygonSample =
     { n = 6
-    , vector = ( 40, 30 )
+    , vector = ( 40, 0 )
     , position = ( 50, 50 )
     , fill = "none"
     , stroke = "gray"
@@ -64,8 +64,9 @@ init =
     { polygons =
         Dict.fromList
             -- polygonRadius - update
-            [ ( 0, polygonRadius 40 polygonSample )
-            , ( 1, polygonRadius 50 polygonSample )
+            [ ( 0, polygonSample |> polygonRadius 20 |> polygonFill "gray" )
+            , ( 1, polygonSample |> polygonStroke "black" )
+            , ( 2, polygonSample |> polygonAlpha 30 )
             ]
     }
 
@@ -78,6 +79,8 @@ type Msg
     = ChangeN Int Int
     | ChangeRadius Int String
     | ChangeAlpha Int String
+    | ChangeFill Int String
+    | ChangeStroke Int String
     | AddPolygon
     | RemovePolygon Int
 
@@ -157,26 +160,61 @@ changeRadius index radius model =
         model
 
 
-changeAlpha : Int -> String -> Model -> Model
-changeAlpha index value model =
-    let
-        updatePolygon =
-            Maybe.map
-                (\p ->
-                    { p
-                        | vector =
-                            ( Tuple.first p.vector
-                            , sanitize value
-                            )
-                    }
-                )
+polygonAlpha : Float -> Polygon -> Polygon
+polygonAlpha alpha p =
+    { p
+        | vector =
+            ( Tuple.first p.vector, alpha )
+    }
 
-        polygonsUpdated =
-            Dict.update index
-                updatePolygon
-                model.polygons
-    in
-    { model | polygons = polygonsUpdated }
+
+changeAlpha : Int -> String -> Model -> Model
+changeAlpha index alpha model =
+    changePolygon index
+        (polygonAlpha
+            (sanitize alpha)
+            (model.polygons
+                |> Dict.get index
+                |> Maybe.withDefault polygonSample
+            )
+        )
+        model
+
+
+polygonFill : String -> Polygon -> Polygon
+polygonFill f p =
+    { p | fill = f }
+
+
+changeFill : Int -> String -> Model -> Model
+changeFill index fill model =
+    changePolygon index
+        (polygonFill
+            fill
+            (model.polygons
+                |> Dict.get index
+                |> Maybe.withDefault polygonSample
+            )
+        )
+        model
+
+
+polygonStroke : String -> Polygon -> Polygon
+polygonStroke s p =
+    { p | stroke = s }
+
+
+changeStroke : Int -> String -> Model -> Model
+changeStroke index stroke model =
+    changePolygon index
+        (polygonStroke
+            stroke
+            (model.polygons
+                |> Dict.get index
+                |> Maybe.withDefault polygonSample
+            )
+        )
+        model
 
 
 update : Msg -> Model -> Model
@@ -196,6 +234,12 @@ update msg model =
 
         ChangeAlpha index alpha ->
             changeAlpha index alpha model
+
+        ChangeFill index fill ->
+            changeFill index fill model
+
+        ChangeStroke index stroke ->
+            changeStroke index stroke model
 
 
 
@@ -236,6 +280,18 @@ polygonsChanger model =
                     , value
                         (data.vector |> Tuple.second |> round 2)
                     , onInput (ChangeAlpha key)
+                    ]
+                    []
+                , input
+                    [ placeholder "fill"
+                    , value data.fill
+                    , onInput (ChangeFill key)
+                    ]
+                    []
+                , input
+                    [ placeholder "stroke"
+                    , value data.stroke
+                    , onInput (ChangeStroke key)
                     ]
                     []
                 , button [ onClick (RemovePolygon key) ] [ text "delete" ]
